@@ -1,0 +1,27 @@
+---
+title: "Master Thesis: OpenEO Use-Cases"
+author: "Marvin Ludwig"
+date: "18/05/2021"
+output: html_document
+---
+
+
+The application of Machine Learning Models for the mapping of Environmental Observations plays a key role in contemporary Remote Sensing. With the availability of more and more airborne and spacebourne data sources with increased spatio-temporal resolution (e.g. Sentinel 2) and the trend towards large-scale analysis, computations on local machines are time-consuming and cumbersome. Cloud-based computations are therefore needed. The openEO project develops an API for big earth observation cloud back-ends in a simple and unified way.  
+In this context, we offer a Master Thesis dealing with the follwing topics:
+
+* The demonstration and promotion of openEO with a real world use-case and workflow (e.g. Landcover Classification)
+* Cloud-based satellite data (pre-)processing and prediction with a trained machine learning model
+* Application and further development of quality assessment methods for spatial predictions
+
+The Thesis will be part of the Ubersat Project and conducted in a collaborative team from ILOEK and IFGI
+
+Contact:
+
+Marvin Ludwig [marvin.ludwig@uni-muenster.de]()
+Hanna Meyer [hanna.meyer@uni-muenster.de]()
+Edzer Pebesma [edzer.pebesma@uni-muenster.de]()
+
+
+
+
+
