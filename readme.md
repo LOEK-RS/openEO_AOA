@@ -3,12 +3,14 @@
 
 Vito Provider
 
+## Plan
+
 1. Preprocess Sentinel-2 data in openEO
 
    - [ ] Time Series 2018
-   - [ ] Cloud Mask with SCL Band
-   - [ ] Median Composit
-   - [ ] 60m Bands raus
+   - [x] Cloud Mask with SCL Band
+   - [x] Median Composit
+   - [x] 60m Bands raus
    - [ ] 20m Bands to 10m resampling
    - [ ] NDVI, EVI
    - [ ] Download
@@ -30,3 +32,18 @@ As inspiration: [Venter et al. 2021](docs/VenterEtAl_2021_Continental-scale_land
 They did exactly this but with Google Earth Engine
 
 [https://github.com/NINAnor/ELC10](https://github.com/NINAnor/ELC10)
+
+## SCL Classification Overview
+
+[source](https://sentinels.copernicus.eu/web/sentinel/technical-guides/sentinel-2-msi/level-2a/algorithm)
+
+![SCL classification overview](./SCL_table.png)
+
+## The occasional status update:
+masking and median composite works on small areas:
+
+![status](./status.png)
+
+1 year cloud-free composite. Seems that there are some issues with cloud shadows that aren't picked up by SCL.
+
+Next: indices, include all bands
