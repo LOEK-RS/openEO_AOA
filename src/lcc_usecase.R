@@ -12,22 +12,24 @@ con <- connect(host = "https://openeo.vito.be")
 
 # authenticate
 login(login_type="basic",
-      user="",
-      password="")
+      user="lc",
+      password="lc123")
 
 # get a process graph builder, see ?processes
 p <- processes()
 
 aoa <- list(west = 10.4005, south = 51.3371, east = 10.5152, north = 51.3856) # niederorschel
-t <- c("2018-01-01", "2018-03-01")
+# smaller:
+aoa <- list(west = 10.452617, south = 51.361166, east = 10.459773, north = 51.364194)
+t <- c("2018-07-01", "2018-10-01")
 
 cube_s2 <- p$load_collection(
   id = "SENTINEL2_L2A_SENTINELHUB",
   spatial_extent = aoa,
   temporal_extent = t,
-  # bands=c("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
-  bands= c("B04", "B03", "B02")
-  # AFAIK resolution stays the highest by default
+  bands=c("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
+  # bands= c("B04", "B03", "B02")
+  # AFAIK resolution stays at highest by default
 )
 
 # load SCL in separate collection, must be same aoi and t extent!
@@ -70,9 +72,44 @@ cube_s2_yearly_composite <- p$reduce_dimension(cube_s2_masked, function(x, conte
   p$median(x, ignore_nodata = TRUE)
 }, "t")
 
+# compute indices here, possibly move up when needed per season or something
+
+ndvi_ <- function(x, context) {
+  b4 <- x[3]
+  b8 <- x[7]
+  return(p$normalized_difference(b8, b4))
+}
+
+evi_ <- function(x, context) {
+  b2 <- x[1]
+  b4 <- x[3]
+  b8 <- x[7]
+  return((2.5 * (b8 - b4)) / ((b8 + 6 * b4 - 7.5 * b2) + 1))
+}
+
+nbr_ <- function(x, context) {
+  b8 <- x[7]
+  b12 <- x[10]
+  return(p$normalized_difference(b8, b12))
+}
+
+cube_s2_yearly_ndvi <- p$reduce_dimension(cube_s2_yearly_composite, ndvi_, "bands")
+cube_s2_yearly_ndvi <- p$add_dimension(cube_s2_yearly_ndvi, name = "bands", label = "NDVI", type = "bands")
+
+cube_s2_yearly_evi <- p$reduce_dimension(cube_s2_yearly_composite, evi_, "bands")
+cube_s2_yearly_evi <- p$add_dimension(cube_s2_yearly_evi, name = "bands", label = "EVI", type = "bands")
+
+cube_s2_yearly_nbr <- p$reduce_dimension(cube_s2_yearly_composite, nbr_, "bands")
+cube_s2_yearly_nbr <- p$add_dimension(cube_s2_yearly_nbr, name = "bands", label = "NBR", type = "bands")
+
+# merge cubes
+cube_s2_yearly_merge1 <- p$merge_cubes(cube_s2_yearly_composite, cube_s2_yearly_ndvi)
+cube_s2_yearly_merge2 <- p$merge_cubes(cube_s2_yearly_merge1, cube_s2_yearly_evi)
+cube_s2_yearly_merge3 <- p$merge_cubes(cube_s2_yearly_merge2, cube_s2_yearly_nbr)
+
 # create result node
-res <- p$save_result(data = cube_s2_yearly_composite, format = "GTiff")
+res <- p$save_result(data = cube_s2_yearly_merge3, format = "NetCDF")
 
 # send job to back-end
-job <- create_job(graph = res, title = "composite_test")
+job <- create_job(graph = res, title = "small_all_indices")
 
