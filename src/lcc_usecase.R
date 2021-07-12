@@ -1,8 +1,5 @@
-# Goal is a landcover classivication covering all of germany, 
+# Goal is a landcover classification covering all of germany, 
 # including a random forest model training and prediction
-
-# Issues, TODO
-# in smaller timespans, filter errors are visible (e.g. cloud shadows)
 
 # load package
 library(openeo)
@@ -19,15 +16,18 @@ login(login_type="basic",
 p <- processes()
 
 aoa <- list(west = 10.4005, south = 51.3371, east = 10.5152, north = 51.3856) # niederorschel
-t <- c("2018-01-01", "2018-03-01")
+# smaller:
+aoa <- list(west = 10.452617, south = 51.361166, east = 10.459773, north = 51.364194)
+t <- c("2018-07-01", "2018-10-01")
 
 cube_s2 <- p$load_collection(
   id = "SENTINEL2_L2A_SENTINELHUB",
   spatial_extent = aoa,
   temporal_extent = t,
+  # load less bands for faster computation
   # bands=c("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
-  bands= c("B04", "B03", "B02")
-  # AFAIK resolution stays the highest by default
+  bands= c("B02", "B04", "B08")
+  # AFAIK resolution stays at highest by default
 )
 
 # load SCL in separate collection, must be same aoi and t extent!
@@ -37,10 +37,6 @@ cube_SCL <- p$load_collection(
   temporal_extent = t,
   bands=c("SCL")
 )
-
-# NDVI, NBR, EVI
-
-# merge cubes accordingly (all into bands dimension)
 
 # define filter function to create mask from a cube that only contains 1 band: SCL
 clouds_ <- function(data, context) {
@@ -70,9 +66,49 @@ cube_s2_yearly_composite <- p$reduce_dimension(cube_s2_masked, function(x, conte
   p$median(x, ignore_nodata = TRUE)
 }, "t")
 
+# compute indices here, possibly move up when needed per season or something
+# CHANGE BAND INDICES HERE WHEN CHANGING BANDS LOADED
+
+ndvi_ <- function(x, context) {
+  b4 <- x[2]
+  b8 <- x[3]
+  return(p$normalized_difference(b8, b4))
+}
+
+evi_ <- function(x, context) {
+  b2 <- x[1]
+  b4 <- x[2]
+  b8 <- x[3]
+  return((2.5 * (b8 - b4)) / ((b8 + 6 * b4 - 7.5 * b2) + 1))
+}
+
+cube_s2_yearly_ndvi <- p$reduce_dimension(cube_s2_yearly_composite, ndvi_, "bands")
+cube_s2_yearly_ndvi <- p$add_dimension(cube_s2_yearly_ndvi, name = "bands", label = "NDVI", type = "bands")
+
+cube_s2_yearly_evi <- p$reduce_dimension(cube_s2_yearly_composite, evi_, "bands")
+cube_s2_yearly_evi <- p$add_dimension(cube_s2_yearly_evi, name = "bands", label = "EVI", type = "bands")
+
+# merge cubes
+cube_s2_yearly_merge1 <- p$merge_cubes(cube_s2_yearly_composite, cube_s2_yearly_ndvi)
+cube_s2_yearly_merge2 <- p$merge_cubes(cube_s2_yearly_merge1, cube_s2_yearly_evi)
+
+## AGGREGATION OF LUCAS DATA ####################
+## ISSUES:
+## no point, only polygon support on VITO
+## aggregate_spatial only works with a temporal dimension present
+## atttributes are not preserved in aggregation
+
+# TODO: buffer points as there is only polygon support
+
+# read lucas data from file (contains SF object), TODO do extraction here!
+# lucas_aoa <- readRDS("./data/lucas/lucas_aoa_ID.rds")
+# aggregate geometries, reducer is not needed but passed anyway
+# cube_s2_yearly_agg <- p$aggregate_spatial(data = cube_s2_yearly_composite, reducer = p$mean, geometries = lucas_aoa)
+
+
+
 # create result node
-res <- p$save_result(data = cube_s2_yearly_composite, format = "GTiff")
+res <- p$save_result(data = cube_s2_yearly_merge2, format = "GTiff")
 
 # send job to back-end
-job <- create_job(graph = res, title = "composite_test")
-
+job <- create_job(graph = res, title = "composite_testing")
