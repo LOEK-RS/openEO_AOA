@@ -3,6 +3,7 @@
 
 # load package
 library(openeo)
+library(sf)
 
 # establish connection
 con <- connect(host = "https://openeo.vito.be")
@@ -15,8 +16,9 @@ login(login_type="basic",
 # get a process graph builder, see ?processes
 p <- processes()
 
+# bigger, for LUCAS testing
 aoa <- list(west = 10.4005, south = 51.3371, east = 10.5152, north = 51.3856) # niederorschel
-# smaller:
+# smaller, for faster runs
 aoa <- list(west = 10.452617, south = 51.361166, east = 10.459773, north = 51.364194)
 t <- c("2018-07-01", "2018-10-01")
 
@@ -25,8 +27,8 @@ cube_s2 <- p$load_collection(
   spatial_extent = aoa,
   temporal_extent = t,
   # load less bands for faster computation
-  # bands=c("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
-  bands= c("B02", "B04", "B08")
+  bands=c("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
+  # bands= c("B02", "B04", "B08")
   # AFAIK resolution stays at highest by default
 )
 
@@ -37,6 +39,17 @@ cube_SCL <- p$load_collection(
   temporal_extent = t,
   bands=c("SCL")
 )
+
+# for efficiency, do filter_spatial here
+# read lucas data from file (contains SF object), TODO do extraction here!
+lucas_aoa <- readRDS("./data/lucas/lucas_aoa_ID.rds")
+# buffer, because only polygons allowed
+lucas_aoa_buf <- st_buffer(lucas_aoa, 10)
+# library(mapview)
+# mapview(lucas_aoa_buf[1,])
+# extract at polygon location
+cube_s2 <- p$filter_spatial(data = cube_s2, geometries = lucas_aoa_buf)
+cube_SCL <- p$filter_spatial(data = cube_SCL, geometries = lucas_aoa_buf)
 
 # define filter function to create mask from a cube that only contains 1 band: SCL
 clouds_ <- function(data, context) {
@@ -68,17 +81,18 @@ cube_s2_yearly_composite <- p$reduce_dimension(cube_s2_masked, function(x, conte
 
 # compute indices here, possibly move up when needed per season or something
 # CHANGE BAND INDICES HERE WHEN CHANGING BANDS LOADED
+# ("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
 
 ndvi_ <- function(x, context) {
-  b4 <- x[2]
-  b8 <- x[3]
+  b4 <- x[3]
+  b8 <- x[7]
   return(p$normalized_difference(b8, b4))
 }
 
 evi_ <- function(x, context) {
   b2 <- x[1]
-  b4 <- x[2]
-  b8 <- x[3]
+  b4 <- x[3]
+  b8 <- x[7]
   return((2.5 * (b8 - b4)) / ((b8 + 6 * b4 - 7.5 * b2) + 1))
 }
 
@@ -98,17 +112,20 @@ cube_s2_yearly_merge2 <- p$merge_cubes(cube_s2_yearly_merge1, cube_s2_yearly_evi
 ## aggregate_spatial only works with a temporal dimension present
 ## atttributes are not preserved in aggregation
 
-# TODO: buffer points as there is only polygon support
-
 # read lucas data from file (contains SF object), TODO do extraction here!
 # lucas_aoa <- readRDS("./data/lucas/lucas_aoa_ID.rds")
+# cube_s2_yearly_extr <- p$filter_spatial(data = cube_s2_yearly_merge2, geometries = lucas_aoa_buf)
+
 # aggregate geometries, reducer is not needed but passed anyway
 # cube_s2_yearly_agg <- p$aggregate_spatial(data = cube_s2_yearly_composite, reducer = p$mean, geometries = lucas_aoa)
 
-
-
 # create result node
-res <- p$save_result(data = cube_s2_yearly_merge2, format = "GTiff")
+res <- p$save_result(data = cube_s2_yearly_merge2, format = "NetCDF", options = list(sample_by_feature = TRUE))
+
+# export with option
+# res <- p$save_result(data = cube_s2_yearly_extr, format = "NetCDF", options = list(sample_by_feature = TRUE))
 
 # send job to back-end
-job <- create_job(graph = res, title = "composite_testing")
+job <- create_job(graph = res, title = "test extract batch 10m")
+
+start_job(job = job)
