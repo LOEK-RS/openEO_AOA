@@ -17,14 +17,17 @@ login(login_type="basic",
 p <- processes()
 
 # bigger, for LUCAS testing
-aoa <- list(west = 10.4005, south = 51.3371, east = 10.5152, north = 51.3856) # niederorschel
+aoi = list(west = 10.3247,
+           south = 51.2996,
+           east = 10.6039,
+           north = 51.4160) # niederorschel
 # smaller, for faster runs
-aoa <- list(west = 10.452617, south = 51.361166, east = 10.459773, north = 51.364194)
+#aoa <- list(west = 10.452617, south = 51.361166, east = 10.459773, north = 51.364194)
 t <- c("2018-07-01", "2018-10-01")
 
 cube_s2 <- p$load_collection(
   id = "SENTINEL2_L2A_SENTINELHUB",
-  spatial_extent = aoa,
+  spatial_extent = aoi,
   temporal_extent = t,
   # load less bands for faster computation
   bands=c("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
@@ -35,21 +38,25 @@ cube_s2 <- p$load_collection(
 # load SCL in separate collection, must be same aoi and t extent!
 cube_SCL <- p$load_collection(
   id = "SENTINEL2_L2A_SENTINELHUB",
-  spatial_extent = aoa,
+  spatial_extent = aoi,
   temporal_extent = t,
   bands=c("SCL")
 )
 
 # for efficiency, do filter_spatial here
 # read lucas data from file (contains SF object), TODO do extraction here!
-lucas_aoa <- readRDS("./data/lucas/lucas_aoa_ID.rds")
+lucas_aoi <- readRDS("./data/lucas/lucas_aoa_ID.rds")
 # buffer, because only polygons allowed
-lucas_aoa_buf <- st_buffer(lucas_aoa, 10)
+lucas_aoi = st_transform(lucas_aoi, 32632)
+lucas_aoi_buf = st_buffer(lucas_aoi, dist = 5, endCapStyle = "SQUARE")
+lucas_aoi_buf = st_transform(lucas_aoi_buf, 4326)
+
+
 # library(mapview)
-# mapview(lucas_aoa_buf[1,])
+#mapview(lucas_aoi_buf)
 # extract at polygon location
-cube_s2 <- p$filter_spatial(data = cube_s2, geometries = lucas_aoa_buf)
-cube_SCL <- p$filter_spatial(data = cube_SCL, geometries = lucas_aoa_buf)
+cube_s2 <- p$filter_spatial(data = cube_s2, geometries = lucas_aoi_buf)
+cube_SCL <- p$filter_spatial(data = cube_SCL, geometries = lucas_aoi_buf)
 
 # define filter function to create mask from a cube that only contains 1 band: SCL
 clouds_ <- function(data, context) {
@@ -126,6 +133,6 @@ res <- p$save_result(data = cube_s2_yearly_merge2, format = "NetCDF", options = 
 # res <- p$save_result(data = cube_s2_yearly_extr, format = "NetCDF", options = list(sample_by_feature = TRUE))
 
 # send job to back-end
-job <- create_job(graph = res, title = "test extract batch 10m")
+job <- create_job(graph = res, title = "test extract batch 02m big")
 
 start_job(job = job)
